@@ -2,4 +2,7 @@
 
 This educational repo contain index.html
 
-CI pipeline created on Jenkins in URL: http://51.250.105.25:8080/
+CI pipeline created on Jenkins in URL: [84.201.140.27]
+
+
+[84.201.140.27]: http://84.201.140.27:8080/
