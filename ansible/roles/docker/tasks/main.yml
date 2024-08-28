@@ -1,0 +1,111 @@
+---
+# tasks file for roles/b7_docker
+- name: Install and run Docker on Ubuntu
+  block:
+  - name: uninstall all conflicting packages on Ubuntu
+    ansible.builtin.apt:
+      pkg:
+      - 'docker.io'
+      - 'docker-doc'
+      - 'docker-compose'
+      - 'docker-compose-v2'
+      - 'podman-docker'
+      - 'containerd'
+      - 'runc'
+      state: absent
+
+  - name: Create a directory for keyrings if it does not exist on Ubuntu
+    ansible.builtin.file:
+      path: /etc/apt/keyrings
+      state: directory
+      mode: '0755'
+
+  - name: Add Docker's official GPG key on Ubuntu
+    ansible.builtin.get_url:
+      url: https://download.docker.com/linux/ubuntu/gpg
+      dest: /etc/apt/keyrings/docker.asc
+      mode: 'a+r'
+
+  - name: Add the repository to Apt sources on Ubuntu
+    ansible.builtin.apt_repository:
+      repo: "deb [arch=amd64 signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu {{ ansible_distribution_release }} stable"
+      filename: 'docker'
+      state: present
+
+  - name: Install the Docker packages on Ubuntu
+    ansible.builtin.apt:
+      pkg:
+      - 'docker-ce'
+      - 'docker-ce-cli'
+      - 'containerd.io'
+      - 'docker-buildx-plugin'
+      - 'docker-compose-plugin'
+      - 'python3-docker'
+      state: present
+      update_cache: true
+  when: ansible_pkg_mgr == "apt"
+
+- name: Install and run Docker on CentOS
+  block:
+  - name: Disable failed repo sourses on CentOS
+    ansible.builtin.lineinfile:
+      destfile: "/etc/yum.repos.d/{{ item }}"
+      state: present
+      backrefs: true
+      regexp: '(^mirrorlist=.*)$'
+      line: '#\1'
+    loop:
+    - "CentOS-Stream-AppStream.repo"
+    - "CentOS-Stream-BaseOS.repo"
+    - "CentOS-Stream-Extras.repo"
+    - "CentOS-Stream-Extras-common.repo"
+
+  - name: Enaable correct repo sourses on CentOS
+    ansible.builtin.lineinfile:
+      destfile: "/etc/yum.repos.d/{{ item }}"
+      state: present
+      backrefs: true
+      regexp: '^#?(baseurl=.*)mirror(.*)$'
+      line: '\1vault\2'
+    loop:
+    - "CentOS-Stream-AppStream.repo"
+    - "CentOS-Stream-BaseOS.repo"
+    - "CentOS-Stream-Extras.repo"
+    - "CentOS-Stream-Extras-common.repo"
+
+  - name: uninstall all conflicting packages on CentOS
+    ansible.builtin.dnf:
+      name: "{{ item }}"
+      state: absent
+    loop:
+    - docker
+    - docker-client
+    - docker-client-latest
+    - docker-common
+    - docker-latest
+    - docker-latest-logrotate
+    - docker-logrotate
+    - docker-engine
+
+  - name: Set up the Docker repository on CentOS
+    ansible.builtin.get_url:
+      url: https://download.docker.com/linux/centos/docker-ce.repo
+      dest: /etc/yum.repos.d/
+      mode: '644'
+
+  - name: Install Docker Engine packages on CentOS
+    ansible.builtin.dnf:
+      name: "{{ item }}"
+      state: present
+    loop:
+    - docker-ce
+    - docker-ce-cli
+    - containerd.io
+    - docker-buildx-plugin
+    - docker-compose-plugin
+
+  - name: Start Docker on CentOS
+    ansible.builtin.service:
+      name: docker
+      state: started
+  when: ansible_pkg_mgr == "dnf"
